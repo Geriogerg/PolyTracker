@@ -1,0 +1,54 @@
+name: polytracker
+
+x-backend: &backend
+  build: ./backend
+  image: polytracker-backend:latest
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    DATABASE_URL: postgresql+psycopg://polytracker:${POSTGRES_PASSWORD:-polytracker}@db:5432/polytracker
+  volumes:
+    - ./config.yaml:/app/config.yaml:ro
+  depends_on:
+    db:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: polytracker
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-polytracker}
+      POSTGRES_DB: polytracker
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U polytracker -d polytracker"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  api:
+    <<: *backend
+    command: ["python", "-m", "polytracker", "api"]
+
+  worker:
+    <<: *backend
+    command: ["python", "-m", "polytracker", "worker"]
+    healthcheck:
+      disable: true
+
+  web:
+    build: ./frontend
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  pgdata:

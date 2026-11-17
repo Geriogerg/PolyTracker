@@ -1,0 +1,80 @@
+# PolyTracker configuration.
+# Secrets (DB URL, API keys, webhook tokens) go in .env, not here.
+# Everything under `scope` and `alerts` can also be edited live from the
+# Settings page; values saved there override this file.
+
+scope:
+  # tags     -> markets from the Gamma tag slugs below
+  # all      -> every active market above min_volume (heavy)
+  # explicit -> only the markets listed in explicit_markets
+  mode: tags
+  tags: [geopolitics, politics, world, middle-east]
+  include_keywords: []          # keep only markets whose question contains one of these (empty = no filter)
+  exclude_keywords: [nfl, nba, epl, "up or down"]
+  explicit_markets: []          # market slugs or 0x condition ids, always tracked whatever the mode
+  min_volume: 25000             # USD lifetime volume
+  max_markets: 150
+  include_closed_days: 90       # keep recently resolved markets: resolutions are what reveal win rates
+
+ingestion:
+  market_sync_minutes: 10
+  trade_poll_seconds: 15        # live polling cadence when the websocket is down or disabled
+  realtime_ws: true             # Polymarket real-time trade socket
+  backfill_max_pages: 40        # 1000 trades per page, per market
+  price_history_fidelity_minutes: 10
+  min_trade_usd: 5              # ignore dust
+
+analysis:
+  interval_minutes: 10
+  lookback_days: 180
+  bet_merge_minutes: 60         # trades on the same outcome within this gap form one "bet"
+  co_bet_window_minutes: 30
+  min_co_bet_markets: 2         # two wallets must co-bet on at least this many distinct markets
+  max_window_wallets: 25        # bigger simultaneous crowds are news surges, not coordination
+  jump_threshold: 0.20          # a 20-point move...
+  jump_window_minutes: 120      # ...within 2 hours counts as a "news" jump
+  pre_jump_hours: 12            # buys up to 12 h before a jump count as pre-jump
+  fresh_wallet_hours: 72
+  hub_min_fanout: 20            # an address linked to >= N tracked wallets is an exchange/bridge, not a link
+  hub_global_recipients: 150    # an address that paid >= N distinct addresses on-chain is a hub
+  min_edge_weight: 3.0
+  min_position_usd: 50
+  keep_runs: 30
+  weights:
+    direct_transfer: 12
+    funding_shared: 10
+    funding_shared_2hop: 6
+    withdrawal_shared: 6
+    co_bet: 1.0                 # per IDF-weighted co-bet market
+    behavior: 3                 # reinforcement only, never creates a link by itself
+
+alerts:
+  enabled: true
+  cluster_score: 70
+  wallet_score: 80
+  large_trade_usd: 25000        # live alert when a wallet scoring >= wallet_score trades at least this
+  cooldown_hours: 12
+
+onchain:
+  provider: etherscan           # etherscan | blockscout (Etherscan-compatible API)
+  chain_id: 137
+  trace_depth: 2                # follow funding up to 2 hops
+  min_wallet_volume_usd: 1000   # only trace wallets that moved at least this much
+  max_traces_per_cycle: 150
+  requests_per_second: 4
+  collateral_tokens:
+    - "0xc011a7e12a19f7b1f670d46f03b03f3342e82dfb"   # pUSD (Polymarket USD, CLOB V2 collateral since Apr 2026)
+    - "0x2791bca1f2de4661ed88a30c99a7a9449aa84174"   # USDC.e (V1 collateral)
+    - "0x3c499c542cef5e3811e1192ce70d8cc03d5c3359"   # native USDC
+  # Protocol contracts are never treated as funders. Verify against
+  # docs.polymarket.com if Polymarket redeploys; unknown ones are caught by
+  # the hub detector anyway.
+  system_addresses:
+    - "0x0000000000000000000000000000000000000000"
+    - "0x4d97dcd97ec945f40cf65f87097ace5ea0476045"   # ConditionalTokens
+    - "0x4bfb41d5b3570defd03c39a9a4d8de6bd8b8982e"   # CTF Exchange (V1)
+    - "0xc5d563a36ae78145c45a50134d48a1215220f80a"   # Neg Risk CTF Exchange (V1)
+    - "0xd91e80cf2e7be2e162c6513ced06f1dd0da35296"   # Neg Risk Adapter
+    - "0x93070a847efef7f70739046a929d47a521f5b8ee"   # Collateral Onramp
+    - "0x2957922eb93258b93368531d39facca3b4dc5854"   # Collateral Offramp
+  known_hubs: []                # add exchange hot wallets you identify, e.g. "0x..."
